@@ -13,6 +13,7 @@ final class AppModel: ObservableObject {
     private let store: SnapshotStore
     private let capture: CaptureEngine
     private let ax = AXWindowController()
+    private var isRestoring = false
 
     init() {
         let dir = FileManager.default
@@ -42,6 +43,8 @@ final class AppModel: ObservableObject {
     /// completion handler itself needs the main thread). Dispatch the engine work to a
     /// background queue and publish the result back on the main actor.
     func restore(_ snapshot: Snapshot) {
+        guard !isRestoring else { return }
+        isRestoring = true
         let ax = self.ax
         DispatchQueue.global(qos: .userInitiated).async {
             let engine = RestoreEngine(workspace: NSWorkspaceController(), windows: ax,
@@ -50,6 +53,7 @@ final class AppModel: ObservableObject {
             DispatchQueue.main.async { [weak self] in
                 self?.lastSummary = summary
                 self?.refresh()
+                self?.isRestoring = false
             }
         }
     }

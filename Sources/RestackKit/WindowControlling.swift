@@ -111,4 +111,10 @@ public final class AXWindowController: WindowControlling, WindowCapturing {
         return Frame(x: point.x, y: point.y, width: size.width, height: size.height)
     }
 }
+
+/// `handleCache` is the only mutable state, and it is only ever accessed on the single
+/// serialized path that owns this controller (see `App/AppModel.swift`'s restore
+/// re-entrancy guard). No concurrent access is possible in practice, so `@unchecked
+/// Sendable` is the correct, explicit way to satisfy Swift 6 strict concurrency checking.
+extension AXWindowController: @unchecked Sendable {}
 #endif
