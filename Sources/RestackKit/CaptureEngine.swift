@@ -32,6 +32,6 @@ public final class CaptureEngine {
             cx >= $0.originX && cx < $0.originX + $0.width &&
             cy >= $0.originY && cy < $0.originY + $0.height
         }) { return hit.stableID }
-        return (displays.first(where: \.isMain) ?? displays.first)?.stableID ?? ""
+        return (displays.first(where: \.isMain) ?? displays.first)?.stableID ?? "unknown"
     }
 }

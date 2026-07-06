@@ -6,6 +6,10 @@ public protocol WindowControlling {
     /// Live windows for a running app, in enumeration order.
     func windows(forBundleID bundleID: String) -> [LiveWindow]
     /// Move/resize a window identified by its handle to a frame (global coords, top-left origin).
+    ///
+    /// Handles are only valid until the next `windows(forBundleID:)` call for that bundle;
+    /// `setFrame` operates on the elements captured by the most recent `windows(forBundleID:)`
+    /// call for the given `bundleID`.
     func setFrame(_ frame: Frame, forWindowHandle handle: Int, bundleID: String)
 }
 
@@ -34,6 +38,12 @@ import ApplicationServices
 public final class AXWindowController: WindowControlling, WindowCapturing {
     public init() {}
 
+    /// Cache of the exact `AXUIElement`s returned by the most recent `windows(forBundleID:)`
+    /// call for each bundle ID, keyed by bundleID. `setFrame` indexes into this cache by
+    /// handle rather than re-enumerating the app's AX windows, to avoid a TOCTOU race where
+    /// the window list changes between `windows(forBundleID:)` and `setFrame`.
+    private var handleCache: [String: [AXUIElement]] = [:]
+
     private func axWindows(forBundleID bundleID: String) -> [(el: AXUIElement, title: String)] {
         guard let app = NSWorkspace.shared.runningApplications
             .first(where: { $0.bundleIdentifier == bundleID }) else { return [] }
@@ -45,22 +55,25 @@ public final class AXWindowController: WindowControlling, WindowCapturing {
     }
 
     public func windows(forBundleID bundleID: String) -> [LiveWindow] {
-        axWindows(forBundleID: bundleID).enumerated().map { idx, w in
+        let elements = axWindows(forBundleID: bundleID)
+        handleCache[bundleID] = elements.map(\.el)
+        return elements.enumerated().map { idx, w in
             LiveWindow(handleID: idx, title: w.title, indexWithinApp: idx)
         }
     }
 
+    /// Moves/resizes the window identified by `handle`, using the `AXUIElement` captured by
+    /// the most recent `windows(forBundleID:)` call for this `bundleID` (does not re-enumerate).
     public func setFrame(_ frame: Frame, forWindowHandle handle: Int, bundleID: String) {
-        let wins = axWindows(forBundleID: bundleID)
-        guard handle >= 0, handle < wins.count else { return }
-        let el = wins[handle].el
-        var pos = CGPoint(x: frame.x, y: frame.y)
+        guard let els = handleCache[bundleID], handle >= 0, handle < els.count else { return }
+        let el = els[handle]
         var size = CGSize(width: frame.width, height: frame.height)
-        if let posVal = AXValueCreate(.cgPoint, &pos) {
-            AXUIElementSetAttributeValue(el, kAXPositionAttribute as CFString, posVal)
-        }
+        var pos = CGPoint(x: frame.x, y: frame.y)
         if let sizeVal = AXValueCreate(.cgSize, &size) {
             AXUIElementSetAttributeValue(el, kAXSizeAttribute as CFString, sizeVal)
+        }
+        if let posVal = AXValueCreate(.cgPoint, &pos) {
+            AXUIElementSetAttributeValue(el, kAXPositionAttribute as CFString, posVal)
         }
     }
 
@@ -86,11 +99,15 @@ public final class AXWindowController: WindowControlling, WindowCapturing {
     private func axFrame(_ el: AXUIElement) -> Frame? {
         var posV: CFTypeRef?, sizeV: CFTypeRef?
         guard AXUIElementCopyAttributeValue(el, kAXPositionAttribute as CFString, &posV) == .success,
-              AXUIElementCopyAttributeValue(el, kAXSizeAttribute as CFString, &sizeV) == .success
+              AXUIElementCopyAttributeValue(el, kAXSizeAttribute as CFString, &sizeV) == .success,
+              let posRef = posV, CFGetTypeID(posRef) == AXValueGetTypeID(),
+              let sizeRef = sizeV, CFGetTypeID(sizeRef) == AXValueGetTypeID()
         else { return nil }
+        let posValue = posRef as! AXValue
+        let sizeValue = sizeRef as! AXValue
         var point = CGPoint.zero, size = CGSize.zero
-        AXValueGetValue(posV as! AXValue, .cgPoint, &point)
-        AXValueGetValue(sizeV as! AXValue, .cgSize, &size)
+        AXValueGetValue(posValue, .cgPoint, &point)
+        AXValueGetValue(sizeValue, .cgSize, &size)
         return Frame(x: point.x, y: point.y, width: size.width, height: size.height)
     }
 }
