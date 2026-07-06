@@ -51,4 +51,11 @@ final class WindowMatcherTests: XCTestCase {
         XCTAssertEqual(pairs.count, 1)
         XCTAssertEqual(pairs.first?.live.handleID, 1)
     }
+
+    func test_windowMatcher_emptyInputs_returnsEmpty() {
+        XCTAssertEqual(WindowMatcher.match(saved: [], live: []), [])
+
+        let saved = [win("A", 0), win("B", 1)]
+        XCTAssertEqual(WindowMatcher.match(saved: saved, live: []), [])
+    }
 }

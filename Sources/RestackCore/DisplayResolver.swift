@@ -13,6 +13,9 @@ public enum DisplayResolver {
     /// If the saved display is still present, return the saved frame unchanged.
     /// If it is gone, clamp (and if needed shrink) the window to fit the main display.
     public static func resolve(slot: WindowSnapshot, available: [LiveDisplay]) -> Frame {
+        guard !available.isEmpty else {
+            return Frame(x: 0, y: 0, width: slot.width, height: slot.height)
+        }
         if available.contains(where: { $0.stableID == slot.displayID }) {
             return Frame(x: slot.x, y: slot.y, width: slot.width, height: slot.height)
         }

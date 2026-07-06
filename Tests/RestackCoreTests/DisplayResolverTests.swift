@@ -32,4 +32,10 @@ final class DisplayResolverTests: XCTestCase {
         XCTAssertLessThanOrEqual(r.width, main.width)
         XCTAssertLessThanOrEqual(r.height, main.height)
     }
+
+    func test_noDisplaysAvailable_fallsBackToOrigin() {
+        let r = DisplayResolver.resolve(slot: slot(displayID: "EXT", x: 3000, y: 100, w: 800, h: 600),
+                                        available: [])
+        XCTAssertEqual(r, Frame(x: 0, y: 0, width: 800, height: 600))
+    }
 }
