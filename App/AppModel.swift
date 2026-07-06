@@ -1,7 +1,7 @@
 // App/AppModel.swift
 import Foundation
 import AppKit
-import RestackCore
+@preconcurrency import RestackCore
 import RestackKit
 import ApplicationServices
 
