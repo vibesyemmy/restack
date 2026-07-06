@@ -33,3 +33,15 @@ final class RestorePlannerTests: XCTestCase {
         XCTAssertEqual(aPlan?.needsLaunch, true)
     }
 }
+
+// Append to Tests/RestackCoreTests/RestorePlannerTests.swift
+extension RestorePlannerTests {
+    func test_restoreSummary_countsAndDescribes() {
+        var s = RestoreSummary(totalWindows: 4)
+        s.recordPlaced()
+        s.recordSkipped(app: "com.b", reason: "app not installed")
+        XCTAssertEqual(s.placedCount, 1)
+        XCTAssertEqual(s.skipped.count, 1)
+        XCTAssertEqual(s.headline, "1 of 4 windows restored")
+    }
+}
