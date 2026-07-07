@@ -64,8 +64,12 @@ public final class DockRestoreCoordinator {
     private func handleConfigChange(to newConfig: String, now: Date) {
         if let saved = try? store.load(forConfig: newConfig) {
             undoBaseline = capture.capture(name: "undo-baseline", now: now)   // pre-restore state
-            _ = restore.restore(saved)
+            let summary = restore.restore(saved)
             notifier.postAutoRestored()
+            notifier.postActivity(ActivityEvent(
+                timestamp: now, trigger: .monitorChange, configID: newConfig,
+                snapshotName: saved.name, placed: summary.placedCount, total: summary.totalWindows,
+                skips: summary.skipped.map { "\($0.app): \($0.reason)" }))
         }
         lastKnownConfigID = newConfig
         lastAutosaveAt = now
@@ -82,16 +86,23 @@ public final class DockRestoreCoordinator {
         // it's the "setup captured, safe to unplug" signal). Title churn never fires this.
         if previous == nil || LayoutDiff.layoutChanged(previous!, snap) {
             notifier.postLayoutAutosaved()
+            notifier.postActivity(ActivityEvent(
+                timestamp: now, trigger: .autosave, configID: key,
+                snapshotName: key, placed: snap.windows.count, total: snap.windows.count))
         }
         lastAutosaveAt = now
     }
 
     /// Re-apply the pre-restore baseline. Returns false if there is nothing to undo.
     @discardableResult
-    public func undoLastRestore() -> Bool {
+    public func undoLastRestore(now: Date = Date()) -> Bool {
         guard let baseline = undoBaseline else { return false }
-        _ = restore.restore(baseline)
+        let summary = restore.restore(baseline)
         undoBaseline = nil
+        notifier.postActivity(ActivityEvent(
+            timestamp: now, trigger: .undo, configID: lastKnownConfigID,
+            snapshotName: baseline.name, placed: summary.placedCount, total: summary.totalWindows,
+            skips: summary.skipped.map { "\($0.app): \($0.reason)" }))
         return true
     }
 }

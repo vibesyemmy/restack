@@ -1,5 +1,6 @@
 // Sources/RestackKit/Notifying.swift
 import Foundation
+import RestackCore
 
 /// Posts user-facing notifications for auto-restore events.
 public protocol Notifying {
@@ -9,11 +10,15 @@ public protocol Notifying {
     /// last saved one for this config (or is the first capture for it). Layout only —
     /// title churn never triggers this. Quiet feedback; no system notification expected.
     func postLayoutAutosaved()
+    /// Structured receipt for an action the coordinator performed (restore/undo/autosave),
+    /// for the app's activity log. No user-facing notification expected.
+    func postActivity(_ event: ActivityEvent)
 }
 
 public extension Notifying {
-    /// Default no-op so simple notifiers and test fakes need not care about autosave events.
+    /// Default no-ops so simple notifiers and test fakes need not care about these events.
     func postLayoutAutosaved() {}
+    func postActivity(_ event: ActivityEvent) {}
 }
 
 #if canImport(UserNotifications)

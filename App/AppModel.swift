@@ -15,6 +15,8 @@ final class AppModel: ObservableObject {
     private let store: SnapshotStore
     private let capture: CaptureEngine
     private let ax = AXWindowController()
+    private let activityLog: ActivityLog
+    @Published var recentEvents: [ActivityEvent] = []
     private var isRestoring = false
     private var permissionWatchTimer: Timer?
 
@@ -35,6 +37,8 @@ final class AppModel: ObservableObject {
             .appendingPathComponent("Restack/snapshots", isDirectory: true)
         self.store = SnapshotStore(directory: dir)
         self.capture = CaptureEngine(capture: ax, displays: CGDisplayProvider())
+        self.activityLog = ActivityLog(directory: dir.deletingLastPathComponent())
+        self.recentEvents = activityLog.recent(limit: 10)
         refresh()
         startTriggers()
     }
@@ -56,7 +60,7 @@ final class AppModel: ObservableObject {
     /// action on the main thread would hang the UI (and risks deadlocking if the
     /// completion handler itself needs the main thread). Dispatch the engine work to a
     /// background queue and publish the result back on the main actor.
-    func restore(_ snapshot: Snapshot) {
+    func restore(_ snapshot: Snapshot, trigger: ActivityEvent.Trigger = .manual) {
         guard !isRestoring else { return }
         isRestoring = true
         let ax = self.ax
@@ -64,12 +68,24 @@ final class AppModel: ObservableObject {
             let engine = RestoreEngine(workspace: NSWorkspaceController(), windows: ax,
                                        displays: CGDisplayProvider(), clock: SystemClock())
             let summary = engine.restore(snapshot)
+            let configID = DisplayConfigID.make(from: CGDisplayProvider().currentDisplays())
             DispatchQueue.main.async { [weak self] in
                 self?.lastSummary = summary
+                self?.logEvent(ActivityEvent(
+                    timestamp: Date(), trigger: trigger, configID: configID,
+                    snapshotName: snapshot.name, placed: summary.placedCount,
+                    total: summary.totalWindows,
+                    skips: summary.skipped.map { "\($0.app): \($0.reason)" }))
                 self?.refresh()
                 self?.isRestoring = false
             }
         }
+    }
+
+    /// Append to the on-disk activity log and refresh the menu's recent list.
+    func logEvent(_ event: ActivityEvent) {
+        try? activityLog.append(event)
+        recentEvents = activityLog.recent(limit: 10)
     }
 
     func delete(_ snapshot: Snapshot) { try? store.delete(id: snapshot.id); refresh() }
@@ -111,6 +127,9 @@ extension AppModel {
             },
             onSave: { [weak self] in
                 DispatchQueue.main.async { self?.saveBounce += 1 }
+            },
+            onActivity: { [weak self] event in
+                DispatchQueue.main.async { self?.logEvent(event) }
             })
         let coord = DockRestoreCoordinator(displays: CGDisplayProvider(),
                                            capture: dockCapture, restore: dockRestore,
@@ -161,10 +180,13 @@ private final class AppNotifier: Notifying {
     private let wrapped: Notifying
     private let onRestore: () -> Void
     private let onSave: () -> Void
-    init(wrapping: Notifying, onRestore: @escaping () -> Void, onSave: @escaping () -> Void) {
+    private let onActivity: (ActivityEvent) -> Void
+    init(wrapping: Notifying, onRestore: @escaping () -> Void, onSave: @escaping () -> Void,
+         onActivity: @escaping (ActivityEvent) -> Void) {
         self.wrapped = wrapping
         self.onRestore = onRestore
         self.onSave = onSave
+        self.onActivity = onActivity
     }
     func postAutoRestored() {
         wrapped.postAutoRestored()
@@ -172,6 +194,9 @@ private final class AppNotifier: Notifying {
     }
     func postLayoutAutosaved() {
         onSave()    // quiet: icon bounce only, no system notification
+    }
+    func postActivity(_ event: ActivityEvent) {
+        onActivity(event)
     }
 }
 

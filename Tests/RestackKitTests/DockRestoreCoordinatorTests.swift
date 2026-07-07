@@ -144,4 +144,52 @@ final class DockRestoreCoordinatorTests: XCTestCase {
         coord.tick(now: at(50))                       // autosave due; only the title differs
         XCTAssertEqual(notifier.autosavedCount, 0)
     }
+
+    func test_dockRestore_emitsActivityEvent() {
+        let displays = FakeDisplays([builtin])
+        let store = FakeAutoLayoutStore()
+        store.byKey["EXT1|builtin"] = Snapshot(name: "docked", createdAt: at(0), displays: [],
+            windows: [WindowSnapshot(appBundleID: "com.a", appName: "A", title: "T",
+                x: 0, y: 0, width: 100, height: 100, displayID: "EXT1", indexWithinApp: 0)])
+        let live = LiveWindow(handleID: 1, title: "T", indexWithinApp: 0)
+        let windows = FakeWindows(eventual: ["com.a": [live]], appearAfter: ["com.a": 0])
+        let notifier = FakeNotifier()
+        let coord = makeCoordinator(displays: displays, store: store, notifier: notifier,
+                                    windows: windows,
+                                    workspace: FakeWorkspace(running: ["com.a"], installed: ["com.a"]),
+                                    capturer: FakeCapturer([]))
+        coord.start(now: at(0))
+        displays.displays = [builtin, ext]
+        coord.observeDisplaysChanged(now: at(1))
+        coord.tick(now: at(3))
+
+        let restoreEvents = notifier.events.filter { $0.trigger == .monitorChange }
+        XCTAssertEqual(restoreEvents.count, 1)
+        XCTAssertEqual(restoreEvents.first?.configID, "EXT1|builtin")
+        XCTAssertEqual(restoreEvents.first?.placed, 1)
+        XCTAssertEqual(restoreEvents.first?.total, 1)
+    }
+
+    func test_undo_emitsActivityEvent() {
+        let displays = FakeDisplays([builtin])
+        let store = FakeAutoLayoutStore()
+        store.byKey["EXT1|builtin"] = Snapshot(name: "docked", createdAt: at(0), displays: [],
+            windows: [WindowSnapshot(appBundleID: "com.a", appName: "A", title: "T",
+                x: 0, y: 0, width: 100, height: 100, displayID: "EXT1", indexWithinApp: 0)])
+        let capturer = FakeCapturer([CapturedWindow(bundleID: "com.a", appName: "A", title: "T",
+            frame: Frame(x: 5, y: 5, width: 50, height: 50), indexWithinApp: 0)])
+        let live = LiveWindow(handleID: 1, title: "T", indexWithinApp: 0)
+        let windows = FakeWindows(eventual: ["com.a": [live]], appearAfter: ["com.a": 0])
+        let notifier = FakeNotifier()
+        let coord = makeCoordinator(displays: displays, store: store, notifier: notifier,
+                                    windows: windows,
+                                    workspace: FakeWorkspace(running: ["com.a"], installed: ["com.a"]),
+                                    capturer: capturer)
+        coord.start(now: at(0))
+        displays.displays = [builtin, ext]
+        coord.observeDisplaysChanged(now: at(1))
+        coord.tick(now: at(3))
+        XCTAssertTrue(coord.undoLastRestore(now: at(10)))
+        XCTAssertEqual(notifier.events.filter { $0.trigger == .undo }.count, 1)
+    }
 }
