@@ -41,10 +41,27 @@ struct MenuBarView: View {
 
                     Divider()
 
-                    if model.snapshots.isEmpty {
+                    // System-managed rolling snapshot, pinned + visually distinct so it
+                    // never gets mistaken for a user-created workspace.
+                    if let last = model.snapshots.first(where: { $0.name == RestackSettings.lastSessionName }) {
+                        HStack {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .foregroundStyle(.secondary)
+                            Text("Last Session").italic()
+                            Text("(automatic)").font(.caption2).foregroundStyle(.secondary)
+                            Spacer()
+                            Button("Restore") { model.restore(last) }
+                                .disabled(model.isRestoringNow)
+                        }
+                        .help("Saved automatically when Restack quits; restored at login.")
+                        Divider()
+                    }
+
+                    let named = model.snapshots.filter { $0.name != RestackSettings.lastSessionName }
+                    if named.isEmpty {
                         Text("No saved workspaces yet").foregroundStyle(.secondary)
                     } else {
-                        ForEach(model.snapshots) { snap in
+                        ForEach(named) { snap in
                             HStack {
                                 Text(snap.name)
                                 Spacer()
