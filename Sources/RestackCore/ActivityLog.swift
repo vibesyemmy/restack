@@ -11,6 +11,7 @@ public struct ActivityEvent: Codable, Equatable, Identifiable {
         case monitorChange = "monitor-change"
         case undo
         case autosave
+        case update          // user refreshed a named workspace with the current arrangement
     }
 
     public let id: UUID

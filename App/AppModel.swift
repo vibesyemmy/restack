@@ -89,6 +89,18 @@ final class AppModel: ObservableObject {
     }
 
     func delete(_ snapshot: Snapshot) { try? store.delete(id: snapshot.id); refresh() }
+
+    /// Recapture the current arrangement into an existing workspace (keeps name + identity).
+    func update(_ snapshot: Snapshot) {
+        var snap = capture.capture(name: snapshot.name, now: Date())
+        snap.id = snapshot.id
+        try? store.save(snap)
+        logEvent(ActivityEvent(
+            timestamp: Date(), trigger: .update,
+            configID: DisplayConfigID.make(from: CGDisplayProvider().currentDisplays()),
+            snapshotName: snap.name, placed: snap.windows.count, total: snap.windows.count))
+        refresh()
+    }
 }
 
 // MARK: - Dock/undock auto-restore

@@ -17,8 +17,9 @@ struct MenuBarView: View {
         case .monitorChange: what = "Monitor change"
         case .undo:          what = "Undo"
         case .autosave:      what = "Layout saved"
+        case .update:        what = "Updated '\(e.snapshotName ?? "workspace")'"
         }
-        let counts = e.trigger == .autosave
+        let counts = (e.trigger == .autosave || e.trigger == .update)
             ? "\(e.total) window\(e.total == 1 ? "" : "s")"
             : "\(e.placed)/\(e.total) restored"
         return "\(time) · \(what) · \(counts)"
@@ -48,6 +49,10 @@ struct MenuBarView: View {
                                 Text(snap.name)
                                 Spacer()
                                 Button("Restore") { model.restore(snap) }
+                                Button { model.update(snap) } label: {
+                                    Image(systemName: "arrow.triangle.2.circlepath")
+                                }
+                                .help("Update with current window arrangement")
                                 Button(role: .destructive) { model.delete(snap) } label: {
                                     Image(systemName: "trash")
                                 }
