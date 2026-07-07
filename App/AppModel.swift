@@ -4,6 +4,7 @@ import AppKit
 @preconcurrency import RestackCore
 import RestackKit
 import ApplicationServices
+import UserNotifications
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -16,6 +17,13 @@ final class AppModel: ObservableObject {
     private let ax = AXWindowController()
     private var isRestoring = false
     private var permissionWatchTimer: Timer?
+
+    // Dock/undock auto-restore
+    @Published var autoRestoreEnabled: Bool = RestackSettings.autoRestoreOnConfigChange
+    private var dockDriver: DockAutoRestoreDriver?
+    private var dockCoordinator: DockRestoreCoordinator?
+    private var notificationRouter: NotificationRouter?
+    private let notifier = UNUserNotificationNotifier()
 
     init() {
         let dir = FileManager.default
@@ -61,6 +69,57 @@ final class AppModel: ObservableObject {
     }
 
     func delete(_ snapshot: Snapshot) { try? store.delete(id: snapshot.id); refresh() }
+}
+
+// MARK: - Dock/undock auto-restore
+
+extension AppModel {
+    /// Called from startTriggers(): register the notification category and, if the setting is
+    /// on, start the driver.
+    func startDockAutoRestore() {
+        notifier.registerCategory()
+        let router = NotificationRouter(onUndo: { [weak self] in self?.undoAutoRestore() })
+        self.notificationRouter = router
+        UNUserNotificationCenter.current().delegate = router
+        if autoRestoreEnabled { startDockDriver() }
+    }
+
+    /// Builds a dedicated `AXWindowController` + engines for the coordinator so its
+    /// capture/restore traffic never races with a manual `restore(_:)` call on the shared
+    /// `ax` controller used elsewhere in `AppModel`.
+    private func startDockDriver() {
+        notifier.requestAuthorization()
+        let dockAX = AXWindowController()
+        let dockCapture = CaptureEngine(capture: dockAX, displays: CGDisplayProvider())
+        let dockRestore = RestoreEngine(workspace: NSWorkspaceController(), windows: dockAX,
+                                        displays: CGDisplayProvider(), clock: SystemClock())
+        let auto = AutoLayoutStore(directory: FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Restack/auto", isDirectory: true))
+        let coord = DockRestoreCoordinator(displays: CGDisplayProvider(),
+                                           capture: dockCapture, restore: dockRestore,
+                                           store: auto, notifier: notifier)
+        self.dockCoordinator = coord
+        let driver = DockAutoRestoreDriver(coordinator: coord)
+        driver.start()
+        dockDriver = driver
+    }
+
+    func setAutoRestore(_ on: Bool) {
+        autoRestoreEnabled = on
+        RestackSettings.autoRestoreOnConfigChange = on
+        if on {
+            startDockDriver()
+        } else {
+            dockDriver?.stop()
+            dockDriver = nil
+            dockCoordinator = nil
+        }
+    }
+
+    /// Undo the most recent auto-restore. Always routes through the driver's serial queue
+    /// so Undo never races with an in-flight tick.
+    func undoAutoRestore() { dockDriver?.requestUndo() }
 }
 
 // MARK: - Accessibility trust
@@ -114,6 +173,7 @@ extension AppModel {
     func startTriggers() {
         Triggers.setLaunchAtLogin(true)
         startPermissionWatch()
+        startDockAutoRestore()
 
         NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification,

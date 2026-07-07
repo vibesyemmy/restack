@@ -44,6 +44,13 @@ struct MenuBarView: View {
                     }
 
                     Divider()
+                    Toggle("Auto-restore when monitors change", isOn: Binding(
+                        get: { model.autoRestoreEnabled },
+                        set: { model.setAutoRestore($0) }
+                    ))
+                    .toggleStyle(.checkbox)
+
+                    Divider()
                     Button("Quit Restack") { NSApplication.shared.terminate(nil) }
                 }
                 .padding(12)
