@@ -52,7 +52,8 @@ final class FakeClock: Clock {
 /// In-memory auto-layout store.
 final class FakeAutoLayoutStore: AutoLayoutStoring {
     var byKey: [String: Snapshot] = [:]
-    func save(_ snapshot: Snapshot, forConfig key: String) throws { byKey[key] = snapshot }
+    var saveCount = 0
+    func save(_ snapshot: Snapshot, forConfig key: String) throws { byKey[key] = snapshot; saveCount += 1 }
     func load(forConfig key: String) throws -> Snapshot? { byKey[key] }
     func exists(forConfig key: String) -> Bool { byKey[key] != nil }
     func delete(forConfig key: String) throws { byKey[key] = nil }

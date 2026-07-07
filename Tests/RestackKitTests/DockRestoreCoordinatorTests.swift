@@ -143,6 +143,28 @@ final class DockRestoreCoordinatorTests: XCTestCase {
         coord.start(now: at(0))
         coord.tick(now: at(50))                       // autosave due; only the title differs
         XCTAssertEqual(notifier.autosavedCount, 0)
+        XCTAssertEqual(store.saveCount, 1)            // still written silently (title freshness)
+    }
+
+    func test_autosaveNothingChanged_skipsDiskWrite() {
+        let displays = FakeDisplays([builtin])
+        let store = FakeAutoLayoutStore()
+        // Pre-seed EXACTLY what CaptureEngine will produce: same window, same title,
+        // same frame, same display snapshot -> no write, no tick.
+        store.byKey["builtin"] = Snapshot(name: "builtin", createdAt: at(0),
+            displays: [DisplaySnapshot(stableID: "builtin", width: 1440, height: 900,
+                                       originX: 0, originY: 0)],
+            windows: [WindowSnapshot(appBundleID: "com.a", appName: "A", title: "T",
+                x: 0, y: 0, width: 100, height: 100, displayID: "builtin", indexWithinApp: 0)])
+        let capturer = FakeCapturer([CapturedWindow(bundleID: "com.a", appName: "A", title: "T",
+            frame: Frame(x: 0, y: 0, width: 100, height: 100), indexWithinApp: 0)])
+        let notifier = FakeNotifier()
+        let coord = makeCoordinator(displays: displays, store: store, notifier: notifier,
+                                    windows: FakeWindows(), workspace: FakeWorkspace(), capturer: capturer)
+        coord.start(now: at(0))
+        coord.tick(now: at(50))                       // autosave due; nothing changed
+        XCTAssertEqual(store.saveCount, 0)
+        XCTAssertEqual(notifier.autosavedCount, 0)
     }
 
     func test_dockRestore_emitsActivityEvent() {
