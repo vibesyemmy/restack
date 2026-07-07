@@ -7,6 +7,24 @@ struct MenuBarView: View {
     @ObservedObject var model: AppModel
     @State private var newName = ""
 
+    /// "09:12 · Monitor change · 7/8 restored" — hover shows skip reasons.
+    private func activityLine(_ e: ActivityEvent) -> String {
+        let time = e.timestamp.formatted(date: .omitted, time: .shortened)
+        let what: String
+        switch e.trigger {
+        case .manual:        what = "Manual restore"
+        case .login:         what = "Login restore"
+        case .monitorChange: what = "Monitor change"
+        case .undo:          what = "Undo"
+        case .autosave:      what = "Layout saved"
+        case .update:        what = "Updated '\(e.snapshotName ?? "workspace")'"
+        }
+        let counts = (e.trigger == .autosave || e.trigger == .update)
+            ? "\(e.total) window\(e.total == 1 ? "" : "s")"
+            : "\(e.placed)/\(e.total) restored"
+        return "\(time) · \(what) · \(counts)"
+    }
+
     var body: some View {
         Group {
             if model.isTrusted {
@@ -31,6 +49,12 @@ struct MenuBarView: View {
                                 Text(snap.name)
                                 Spacer()
                                 Button("Restore") { model.restore(snap) }
+                                    .disabled(model.isRestoringNow)
+                                Button { model.update(snap) } label: {
+                                    Image(systemName: "arrow.triangle.2.circlepath")
+                                }
+                                .help("Update with current window arrangement")
+                                .disabled(model.isRestoringNow)
                                 Button(role: .destructive) { model.delete(snap) } label: {
                                     Image(systemName: "trash")
                                 }
@@ -41,6 +65,31 @@ struct MenuBarView: View {
                     if let s = model.lastSummary {
                         Divider()
                         Text(s.headline).font(.caption).foregroundStyle(.secondary)
+                    }
+
+                    Divider()
+                    Toggle("Auto-restore when monitors change", isOn: Binding(
+                        get: { model.autoRestoreEnabled },
+                        set: { model.setAutoRestore($0) }
+                    ))
+                    .toggleStyle(.checkbox)
+
+                    if model.showUndoRow {
+                        Button("Undo last auto-restore") {
+                            model.undoAutoRestore()
+                            model.showUndoRow = false
+                        }
+                    }
+
+                    if !model.recentEvents.isEmpty {
+                        Divider()
+                        Text("Recent Activity").font(.caption).bold()
+                        ForEach(model.recentEvents.prefix(5)) { event in
+                            Text(activityLine(event))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .help(event.skips.isEmpty ? "" : event.skips.joined(separator: "\n"))
+                        }
                     }
 
                     Divider()

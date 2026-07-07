@@ -28,6 +28,6 @@ enum Triggers {
         } else {
             target = model.snapshots.first { $0.name == RestackSettings.lastSessionName }
         }
-        if let snap = target { model.restore(snap) }
+        if let snap = target { model.restore(snap, trigger: .login) }
     }
 }

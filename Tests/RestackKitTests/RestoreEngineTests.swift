@@ -55,4 +55,20 @@ final class RestoreEngineTests: XCTestCase {
 
     // helper reused by first test
     private func snapshotWindows() -> [WindowSnapshot] { [win("com.a", "A", 0, x: 250)] }
+
+    func test_runningButWindowlessApp_isReopenedThenPlaced() {
+        // Browsers keep running after their last window closes: app "running", zero windows.
+        // The engine must re-open it (macOS reopen -> new window) and then place it.
+        let live = LiveWindow(handleID: 3, title: "T", indexWithinApp: 0)
+        let ws = FakeWorkspace(running: ["com.b"], installed: ["com.b"])
+        // First wait exhausts its polls (33 calls at 8s/0.25s); windows appear only after
+        // call 35 — i.e. during the second, post-reopen wait.
+        let windows = FakeWindows(eventual: ["com.b": [live]], appearAfter: ["com.b": 35])
+        let engine = RestoreEngine(workspace: ws, windows: windows,
+                                   displays: FakeDisplays([d1]), clock: FakeClock())
+        let summary = engine.restore(snapshot([win("com.b", "T", 0, x: 100)]))
+        XCTAssertEqual(ws.launched, ["com.b"])   // reopen attempted despite already running
+        XCTAssertEqual(summary.placedCount, 1)
+        XCTAssertTrue(summary.skipped.isEmpty)
+    }
 }
