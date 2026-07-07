@@ -21,6 +21,7 @@ final class AppModel: ObservableObject {
     // Dock/undock auto-restore
     @Published var autoRestoreEnabled: Bool = RestackSettings.autoRestoreOnConfigChange
     @Published var restorePulse = false      // menu-bar icon animates while true
+    @Published var saveBounce = 0            // increments per layout autosave -> icon bounces once
     @Published var showUndoRow = false       // transient "Undo last auto-restore" menu row
     private var flashGeneration = 0
     private var dockDriver: DockAutoRestoreDriver?
@@ -100,11 +101,17 @@ extension AppModel {
         let auto = AutoLayoutStore(directory: FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Restack/auto", isDirectory: true))
-        // Wrap the UN notifier so an auto-restore also pulses the menu-bar icon.
-        // The coordinator fires this on its serial background queue -> hop to main.
-        let appNotifier = AppNotifier(wrapping: notifier) { [weak self] in
-            DispatchQueue.main.async { self?.flashRestoreIndicator() }
-        }
+        // Wrap the UN notifier so an auto-restore pulses the menu-bar icon and a
+        // layout autosave bounces it once. The coordinator fires these on its serial
+        // background queue -> hop to main.
+        let appNotifier = AppNotifier(
+            wrapping: notifier,
+            onRestore: { [weak self] in
+                DispatchQueue.main.async { self?.flashRestoreIndicator() }
+            },
+            onSave: { [weak self] in
+                DispatchQueue.main.async { self?.saveBounce += 1 }
+            })
         let coord = DockRestoreCoordinator(displays: CGDisplayProvider(),
                                            capture: dockCapture, restore: dockRestore,
                                            store: auto, notifier: appNotifier)
@@ -148,18 +155,23 @@ extension AppModel {
     }
 }
 
-/// Wraps the UN notifier and additionally fires an in-app callback so the
-/// menu-bar icon can react to auto-restores.
+/// Wraps the UN notifier and additionally fires in-app callbacks so the
+/// menu-bar icon can react to auto-restores (pulse) and layout autosaves (bounce).
 private final class AppNotifier: Notifying {
     private let wrapped: Notifying
     private let onRestore: () -> Void
-    init(wrapping: Notifying, onRestore: @escaping () -> Void) {
+    private let onSave: () -> Void
+    init(wrapping: Notifying, onRestore: @escaping () -> Void, onSave: @escaping () -> Void) {
         self.wrapped = wrapping
         self.onRestore = onRestore
+        self.onSave = onSave
     }
     func postAutoRestored() {
         wrapped.postAutoRestored()
         onRestore()
+    }
+    func postLayoutAutosaved() {
+        onSave()    // quiet: icon bounce only, no system notification
     }
 }
 

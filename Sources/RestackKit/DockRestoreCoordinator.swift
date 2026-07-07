@@ -76,7 +76,13 @@ public final class DockRestoreCoordinator {
                                     interval: autosaveInterval, inTransition: inTransition) else { return }
         let key = currentConfigID()
         let snap = capture.capture(name: key, now: now)
+        let previous = try? store.load(forConfig: key)
         try? store.save(snap, forConfig: key)
+        // Quiet UI tick when the saved layout actually changed (first capture counts —
+        // it's the "setup captured, safe to unplug" signal). Title churn never fires this.
+        if previous == nil || LayoutDiff.layoutChanged(previous!, snap) {
+            notifier.postLayoutAutosaved()
+        }
         lastAutosaveAt = now
     }
 

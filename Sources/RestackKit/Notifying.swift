@@ -5,6 +5,15 @@ import Foundation
 public protocol Notifying {
     /// Notify the user that Restack auto-restored a layout (offer Undo in the UI layer).
     func postAutoRestored()
+    /// Called when a periodic autosave captured a layout that meaningfully differs from the
+    /// last saved one for this config (or is the first capture for it). Layout only —
+    /// title churn never triggers this. Quiet feedback; no system notification expected.
+    func postLayoutAutosaved()
+}
+
+public extension Notifying {
+    /// Default no-op so simple notifiers and test fakes need not care about autosave events.
+    func postLayoutAutosaved() {}
 }
 
 #if canImport(UserNotifications)

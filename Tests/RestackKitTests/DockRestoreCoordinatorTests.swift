@@ -109,4 +109,39 @@ final class DockRestoreCoordinatorTests: XCTestCase {
         coord.tick(now: at(4))
         XCTAssertEqual(notifier.postedCount, 0)
     }
+
+    func test_autosaveWithLayoutChange_ticksNotifier() {
+        let displays = FakeDisplays([builtin])
+        let store = FakeAutoLayoutStore()
+        // Previously saved layout has the window at x:0; current capture has it at x:200.
+        store.byKey["builtin"] = Snapshot(name: "builtin", createdAt: at(0), displays: [],
+            windows: [WindowSnapshot(appBundleID: "com.a", appName: "A", title: "Old",
+                x: 0, y: 0, width: 100, height: 100, displayID: "builtin", indexWithinApp: 0)])
+        let capturer = FakeCapturer([CapturedWindow(bundleID: "com.a", appName: "A", title: "Old",
+            frame: Frame(x: 200, y: 0, width: 100, height: 100), indexWithinApp: 0)])
+        let notifier = FakeNotifier()
+        let coord = makeCoordinator(displays: displays, store: store, notifier: notifier,
+                                    windows: FakeWindows(), workspace: FakeWorkspace(), capturer: capturer)
+        coord.start(now: at(0))
+        coord.tick(now: at(50))                       // autosave due; layout moved
+        XCTAssertEqual(notifier.autosavedCount, 1)
+        XCTAssertEqual(notifier.postedCount, 0)       // no restore notification
+    }
+
+    func test_autosaveTitleChurnOnly_staysQuiet() {
+        let displays = FakeDisplays([builtin])
+        let store = FakeAutoLayoutStore()
+        // Same placement, different title -> not a layout change, no tick.
+        store.byKey["builtin"] = Snapshot(name: "builtin", createdAt: at(0), displays: [],
+            windows: [WindowSnapshot(appBundleID: "com.a", appName: "A", title: "Tab One",
+                x: 0, y: 0, width: 100, height: 100, displayID: "builtin", indexWithinApp: 0)])
+        let capturer = FakeCapturer([CapturedWindow(bundleID: "com.a", appName: "A", title: "Tab Two",
+            frame: Frame(x: 0, y: 0, width: 100, height: 100), indexWithinApp: 0)])
+        let notifier = FakeNotifier()
+        let coord = makeCoordinator(displays: displays, store: store, notifier: notifier,
+                                    windows: FakeWindows(), workspace: FakeWorkspace(), capturer: capturer)
+        coord.start(now: at(0))
+        coord.tick(now: at(50))                       // autosave due; only the title differs
+        XCTAssertEqual(notifier.autosavedCount, 0)
+    }
 }

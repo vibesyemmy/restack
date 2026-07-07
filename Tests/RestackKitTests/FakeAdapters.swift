@@ -61,7 +61,9 @@ final class FakeAutoLayoutStore: AutoLayoutStoring {
 /// Records auto-restore notifications.
 final class FakeNotifier: Notifying {
     var postedCount = 0
+    var autosavedCount = 0
     func postAutoRestored() { postedCount += 1 }
+    func postLayoutAutosaved() { autosavedCount += 1 }
 }
 
 /// Window capturer returning a fixed set of windows, for CaptureEngine in coordinator tests.
