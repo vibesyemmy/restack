@@ -88,6 +88,7 @@ extension AppModel {
     /// capture/restore traffic never races with a manual `restore(_:)` call on the shared
     /// `ax` controller used elsewhere in `AppModel`.
     private func startDockDriver() {
+        dockDriver?.stop()            // idempotent: never leave a prior driver's timer/observer running
         notifier.requestAuthorization()
         let dockAX = AXWindowController()
         let dockCapture = CaptureEngine(capture: dockAX, displays: CGDisplayProvider())

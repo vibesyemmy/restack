@@ -54,5 +54,7 @@ public final class DockAutoRestoreDriver {
         timer?.invalidate()
         timer = nil
     }
+
+    deinit { stop() }
 }
 #endif
