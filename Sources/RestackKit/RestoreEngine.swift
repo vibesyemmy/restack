@@ -35,7 +35,14 @@ public final class RestoreEngine {
                 }
             }
             // Wait for windows.
-            let live = waiter.waitForWindows(bundleID: appPlan.bundleID)
+            var live = waiter.waitForWindows(bundleID: appPlan.bundleID)
+            if live.isEmpty {
+                // Apps like browsers keep running after their last window closes, so the
+                // app is "running" but windowless and there is nothing to place. Re-opening
+                // it fires macOS's reopen event, which makes such apps create a new window.
+                _ = workspace.launch(bundleID: appPlan.bundleID)
+                live = waiter.waitForWindows(bundleID: appPlan.bundleID)
+            }
             if live.isEmpty {
                 for _ in appPlan.windows {
                     summary.recordSkipped(app: appPlan.bundleID, reason: "no windows appeared")
