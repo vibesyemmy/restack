@@ -67,7 +67,9 @@ final class DisplayConfigIDTests: XCTestCase {
     }
 
     func test_multiDisplayJoinedSorted() {
-        XCTAssertEqual(DisplayConfigID.make(from: [d("EXT1"), d("builtin")]), "builtin|EXT1")
+        // Swift's default String sort is Unicode-scalar-ordinal: uppercase 'E' (0x45) precedes
+        // lowercase 'b' (0x62). Determinism + order-independence is all the key requires.
+        XCTAssertEqual(DisplayConfigID.make(from: [d("EXT1"), d("builtin")]), "EXT1|builtin")
     }
 
     func test_empty() {
