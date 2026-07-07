@@ -9,7 +9,7 @@ struct MenuBarView: View {
 
     var body: some View {
         Group {
-            if model.isAccessibilityTrusted {
+            if model.isTrusted {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Restack").font(.headline)
 

@@ -15,6 +15,8 @@ struct OnboardingView: View {
                     NSWorkspace.shared.open(url)
                 }
             }
+            Divider()
+            Button("Quit Restack") { NSApplication.shared.terminate(nil) }
         }
         .padding(12).frame(width: 320)
     }

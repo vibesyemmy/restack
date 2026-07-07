@@ -9,11 +9,13 @@ import ApplicationServices
 final class AppModel: ObservableObject {
     @Published var snapshots: [Snapshot] = []
     @Published var lastSummary: RestoreSummary?
+    @Published var isTrusted: Bool = AXIsProcessTrusted()
 
     private let store: SnapshotStore
     private let capture: CaptureEngine
     private let ax = AXWindowController()
     private var isRestoring = false
+    private var permissionWatchTimer: Timer?
 
     init() {
         let dir = FileManager.default
@@ -64,11 +66,30 @@ final class AppModel: ObservableObject {
 // MARK: - Accessibility trust
 
 extension AppModel {
-    var isAccessibilityTrusted: Bool { AXIsProcessTrusted() }
-
     func promptForAccessibility() {
         let opts = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as String: true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(opts)
+    }
+
+    /// Polls `AXIsProcessTrusted()` on a ~1s timer so the UI can react to permission
+    /// being granted while the app is running, without requiring a relaunch. Only
+    /// runs while untrusted; stops itself the moment trust is detected.
+    func startPermissionWatch() {
+        guard !isTrusted else { return }
+        guard permissionWatchTimer == nil else { return }
+
+        let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if AXIsProcessTrusted() {
+                    self.isTrusted = true
+                    self.permissionWatchTimer?.invalidate()
+                    self.permissionWatchTimer = nil
+                }
+            }
+        }
+        permissionWatchTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 }
 
@@ -92,6 +113,7 @@ extension AppModel {
     /// cleanly.
     func startTriggers() {
         Triggers.setLaunchAtLogin(true)
+        startPermissionWatch()
 
         NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification,
