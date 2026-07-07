@@ -566,7 +566,7 @@ final class DockRestoreCoordinatorTests: XCTestCase {
         let displays = FakeDisplays([builtin])
         let store = FakeAutoLayoutStore()
         // Pre-seed a saved layout for the docked config.
-        store.byKey["builtin|EXT1"] = Snapshot(name: "docked", createdAt: at(0),
+        store.byKey["EXT1|builtin"] = Snapshot(name: "docked", createdAt: at(0),
             displays: [], windows: [WindowSnapshot(appBundleID: "com.a", appName: "A", title: "T",
                 x: 0, y: 0, width: 100, height: 100, displayID: "EXT1", indexWithinApp: 0)])
         let notifier = FakeNotifier()
@@ -605,7 +605,7 @@ final class DockRestoreCoordinatorTests: XCTestCase {
     func test_undo_reappliesBaseline() {
         let displays = FakeDisplays([builtin])
         let store = FakeAutoLayoutStore()
-        store.byKey["builtin|EXT1"] = Snapshot(name: "docked", createdAt: at(0), displays: [],
+        store.byKey["EXT1|builtin"] = Snapshot(name: "docked", createdAt: at(0), displays: [],
             windows: [WindowSnapshot(appBundleID: "com.a", appName: "A", title: "T",
                 x: 0, y: 0, width: 100, height: 100, displayID: "EXT1", indexWithinApp: 0)])
         // Capturer returns the current (pre-restore) window so the Undo baseline is non-empty.
