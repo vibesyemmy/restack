@@ -48,3 +48,25 @@ final class FakeClock: Clock {
     func now() -> Date { t }
     func sleep(_ interval: TimeInterval) { t = t.addingTimeInterval(interval) }
 }
+
+/// In-memory auto-layout store.
+final class FakeAutoLayoutStore: AutoLayoutStoring {
+    var byKey: [String: Snapshot] = [:]
+    func save(_ snapshot: Snapshot, forConfig key: String) throws { byKey[key] = snapshot }
+    func load(forConfig key: String) throws -> Snapshot? { byKey[key] }
+    func exists(forConfig key: String) -> Bool { byKey[key] != nil }
+    func delete(forConfig key: String) throws { byKey[key] = nil }
+}
+
+/// Records auto-restore notifications.
+final class FakeNotifier: Notifying {
+    var postedCount = 0
+    func postAutoRestored() { postedCount += 1 }
+}
+
+/// Window capturer returning a fixed set of windows, for CaptureEngine in coordinator tests.
+final class FakeCapturer: WindowCapturing {
+    var windows: [CapturedWindow]
+    init(_ windows: [CapturedWindow]) { self.windows = windows }
+    func captureAllWindows() -> [CapturedWindow] { windows }
+}
