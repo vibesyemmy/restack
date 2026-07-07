@@ -63,6 +63,7 @@ public final class DockRestoreCoordinator {
 
     private func handleConfigChange(to newConfig: String, now: Date) {
         if let saved = try? store.load(forConfig: newConfig) {
+            notifier.postRestoreStarted()
             undoBaseline = capture.capture(name: "undo-baseline", now: now)   // pre-restore state
             let summary = restore.restore(saved)
             notifier.postAutoRestored()
@@ -103,6 +104,7 @@ public final class DockRestoreCoordinator {
     @discardableResult
     public func undoLastRestore(now: Date = Date()) -> Bool {
         guard let baseline = undoBaseline else { return false }
+        notifier.postRestoreStarted()
         let summary = restore.restore(baseline)
         undoBaseline = nil
         notifier.postActivity(ActivityEvent(

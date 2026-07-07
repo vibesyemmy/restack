@@ -49,10 +49,12 @@ struct MenuBarView: View {
                                 Text(snap.name)
                                 Spacer()
                                 Button("Restore") { model.restore(snap) }
+                                    .disabled(model.isRestoringNow)
                                 Button { model.update(snap) } label: {
                                     Image(systemName: "arrow.triangle.2.circlepath")
                                 }
                                 .help("Update with current window arrangement")
+                                .disabled(model.isRestoringNow)
                                 Button(role: .destructive) { model.delete(snap) } label: {
                                     Image(systemName: "trash")
                                 }

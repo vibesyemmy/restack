@@ -25,6 +25,7 @@ final class AppModel: ObservableObject {
     @Published var restorePulse = false      // menu-bar icon animates while true
     @Published var saveBounce = 0            // increments per layout autosave -> icon bounces once
     @Published var showUndoRow = false       // transient "Undo last auto-restore" menu row
+    @Published var isRestoringNow = false    // in-progress indicator: icon swap + disabled buttons
     private var flashGeneration = 0
     private var dockDriver: DockAutoRestoreDriver?
     private var dockCoordinator: DockRestoreCoordinator?
@@ -63,6 +64,7 @@ final class AppModel: ObservableObject {
     func restore(_ snapshot: Snapshot, trigger: ActivityEvent.Trigger = .manual) {
         guard !isRestoring else { return }
         isRestoring = true
+        isRestoringNow = true
         let ax = self.ax
         DispatchQueue.global(qos: .userInitiated).async {
             let engine = RestoreEngine(workspace: NSWorkspaceController(), windows: ax,
@@ -78,6 +80,7 @@ final class AppModel: ObservableObject {
                     skips: summary.skipped.map { "\($0.app): \($0.reason)" }))
                 self?.refresh()
                 self?.isRestoring = false
+                self?.isRestoringNow = false
             }
         }
     }
@@ -141,7 +144,16 @@ extension AppModel {
                 DispatchQueue.main.async { self?.saveBounce += 1 }
             },
             onActivity: { [weak self] event in
-                DispatchQueue.main.async { self?.logEvent(event) }
+                DispatchQueue.main.async {
+                    self?.logEvent(event)
+                    // Coordinator-driven restores/undos complete with their receipt event.
+                    if event.trigger == .monitorChange || event.trigger == .undo {
+                        self?.isRestoringNow = false
+                    }
+                }
+            },
+            onRestoreStarted: { [weak self] in
+                DispatchQueue.main.async { self?.isRestoringNow = true }
             })
         let coord = DockRestoreCoordinator(displays: CGDisplayProvider(),
                                            capture: dockCapture, restore: dockRestore,
@@ -193,12 +205,15 @@ private final class AppNotifier: Notifying {
     private let onRestore: () -> Void
     private let onSave: () -> Void
     private let onActivity: (ActivityEvent) -> Void
+    private let onRestoreStarted: () -> Void
     init(wrapping: Notifying, onRestore: @escaping () -> Void, onSave: @escaping () -> Void,
-         onActivity: @escaping (ActivityEvent) -> Void) {
+         onActivity: @escaping (ActivityEvent) -> Void,
+         onRestoreStarted: @escaping () -> Void) {
         self.wrapped = wrapping
         self.onRestore = onRestore
         self.onSave = onSave
         self.onActivity = onActivity
+        self.onRestoreStarted = onRestoreStarted
     }
     func postAutoRestored() {
         wrapped.postAutoRestored()
@@ -209,6 +224,9 @@ private final class AppNotifier: Notifying {
     }
     func postActivity(_ event: ActivityEvent) {
         onActivity(event)
+    }
+    func postRestoreStarted() {
+        onRestoreStarted()
     }
 }
 

@@ -13,12 +13,16 @@ public protocol Notifying {
     /// Structured receipt for an action the coordinator performed (restore/undo/autosave),
     /// for the app's activity log. No user-facing notification expected.
     func postActivity(_ event: ActivityEvent)
+    /// Fired just before a (potentially multi-second) restore begins, so the UI can show
+    /// an in-progress indicator. Paired with postAutoRestored()/postActivity on completion.
+    func postRestoreStarted()
 }
 
 public extension Notifying {
     /// Default no-ops so simple notifiers and test fakes need not care about these events.
     func postLayoutAutosaved() {}
     func postActivity(_ event: ActivityEvent) {}
+    func postRestoreStarted() {}
 }
 
 #if canImport(UserNotifications)
