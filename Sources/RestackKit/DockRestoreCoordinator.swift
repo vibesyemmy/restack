@@ -62,7 +62,7 @@ public final class DockRestoreCoordinator {
     }
 
     private func handleConfigChange(to newConfig: String, now: Date) {
-        if let saved = try? store.load(forConfig: newConfig), store.exists(forConfig: newConfig) {
+        if let saved = try? store.load(forConfig: newConfig) {
             undoBaseline = capture.capture(name: "undo-baseline", now: now)   // pre-restore state
             _ = restore.restore(saved)
             notifier.postAutoRestored()
