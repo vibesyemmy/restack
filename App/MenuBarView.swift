@@ -50,6 +50,13 @@ struct MenuBarView: View {
                     ))
                     .toggleStyle(.checkbox)
 
+                    if model.showUndoRow {
+                        Button("Undo last auto-restore") {
+                            model.undoAutoRestore()
+                            model.showUndoRow = false
+                        }
+                    }
+
                     Divider()
                     Button("Quit Restack") { NSApplication.shared.terminate(nil) }
                 }

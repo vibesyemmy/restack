@@ -20,6 +20,9 @@ final class AppModel: ObservableObject {
 
     // Dock/undock auto-restore
     @Published var autoRestoreEnabled: Bool = RestackSettings.autoRestoreOnConfigChange
+    @Published var restorePulse = false      // menu-bar icon animates while true
+    @Published var showUndoRow = false       // transient "Undo last auto-restore" menu row
+    private var flashGeneration = 0
     private var dockDriver: DockAutoRestoreDriver?
     private var dockCoordinator: DockRestoreCoordinator?
     private var notificationRouter: NotificationRouter?
@@ -97,9 +100,14 @@ extension AppModel {
         let auto = AutoLayoutStore(directory: FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Restack/auto", isDirectory: true))
+        // Wrap the UN notifier so an auto-restore also pulses the menu-bar icon.
+        // The coordinator fires this on its serial background queue -> hop to main.
+        let appNotifier = AppNotifier(wrapping: notifier) { [weak self] in
+            DispatchQueue.main.async { self?.flashRestoreIndicator() }
+        }
         let coord = DockRestoreCoordinator(displays: CGDisplayProvider(),
                                            capture: dockCapture, restore: dockRestore,
-                                           store: auto, notifier: notifier)
+                                           store: auto, notifier: appNotifier)
         self.dockCoordinator = coord
         let driver = DockAutoRestoreDriver(coordinator: coord)
         driver.start()
@@ -121,6 +129,38 @@ extension AppModel {
     /// Undo the most recent auto-restore. Always routes through the driver's serial queue
     /// so Undo never races with an in-flight tick.
     func undoAutoRestore() { dockDriver?.requestUndo() }
+
+    /// Pulse the menu-bar icon (~4s) and surface the transient Undo row (~30s) after an
+    /// auto-restore. Generation counter so overlapping restores don't cut a flash short.
+    func flashRestoreIndicator() {
+        flashGeneration += 1
+        let gen = flashGeneration
+        restorePulse = true
+        showUndoRow = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+            guard let self, self.flashGeneration == gen else { return }
+            self.restorePulse = false
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
+            guard let self, self.flashGeneration == gen else { return }
+            self.showUndoRow = false
+        }
+    }
+}
+
+/// Wraps the UN notifier and additionally fires an in-app callback so the
+/// menu-bar icon can react to auto-restores.
+private final class AppNotifier: Notifying {
+    private let wrapped: Notifying
+    private let onRestore: () -> Void
+    init(wrapping: Notifying, onRestore: @escaping () -> Void) {
+        self.wrapped = wrapping
+        self.onRestore = onRestore
+    }
+    func postAutoRestored() {
+        wrapped.postAutoRestored()
+        onRestore()
+    }
 }
 
 // MARK: - Accessibility trust
