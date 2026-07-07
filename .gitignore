@@ -3,3 +3,5 @@
 .build/
 Restack.app/
 *.app/
+Restack.zip
+*.zip

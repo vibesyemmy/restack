@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	Restack intentionally omits com.apple.security.app-sandbox.
+
+	Restack drives the Accessibility (AXUIElement) API to read and move the
+	windows of OTHER applications, and uses NSWorkspace to launch/activate
+	other apps. Both require the ability to send Apple Events / AX requests
+	across process boundaries to arbitrary target apps chosen by the user at
+	runtime. The App Sandbox restricts inter-app AX control and Apple Event
+	messaging to a fixed, pre-declared set of targets (via
+	com.apple.security.temporary-exception.apple-events / AEInteractWithClient),
+	which is incompatible with a general-purpose window manager. Sandboxing
+	Restack would break its core feature, so it ships as a non-sandboxed,
+	Developer ID-distributed, Hardened Runtime app instead (notarization does
+	not require sandboxing).
+
+	No other entitlements are needed: Restack does not use JIT, unsigned
+	executable memory, DYLD env vars, or any hardened-runtime exception, so
+	this file is otherwise empty.
+	-->
+</dict>
+</plist>
